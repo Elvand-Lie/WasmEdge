@@ -7,13 +7,16 @@
 #include "driver/tool.h"
 #include "driver/unitool.h"
 #include "po/argument_parser.h"
+#include "spdlog/sinks/ostream_sink.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
 #include <iterator>
+#include <sstream>
 #include <string>
 #if !WASMEDGE_OS_WINDOWS
 #include <unistd.h>
@@ -882,6 +885,40 @@ TEST(CompileSubcommand, CompilerSpecificFlags) {
   EXPECT_EQ(callCompile({"--optimize", "invalid", Path, Output.c_str()}),
             EXIT_SUCCESS);
   std::filesystem::remove(Output.c_str());
+}
+
+TEST(CompileSubcommand, OptimizeLevelWarning) {
+  std::string PathStr = simplePath();
+  const char *Path = PathStr.c_str();
+  std::string Output = TestDataPath + "/optimize_warning_out.wasm";
+  const std::string Warning = "Unknown --optimize value";
+
+  const auto Logger = spdlog::default_logger();
+  const auto PrevLevel = Logger->level();
+  std::ostringstream Captured;
+  const spdlog::sink_ptr Sink =
+      std::make_shared<spdlog::sinks::ostream_sink_mt>(Captured);
+  Logger->sinks().push_back(Sink);
+
+  EXPECT_EQ(callCompile({Path, Output.c_str()}), EXIT_SUCCESS);
+  EXPECT_EQ(Captured.str().find(Warning), std::string::npos);
+  std::filesystem::remove(Output.c_str());
+  Captured.str("");
+
+  EXPECT_EQ(callCompile({"--optimize", "2", Path, Output.c_str()}),
+            EXIT_SUCCESS);
+  EXPECT_EQ(Captured.str().find(Warning), std::string::npos);
+  std::filesystem::remove(Output.c_str());
+  Captured.str("");
+
+  EXPECT_EQ(callCompile({"--optimize", "invalid", Path, Output.c_str()}),
+            EXIT_SUCCESS);
+  EXPECT_NE(Captured.str().find(Warning), std::string::npos);
+  std::filesystem::remove(Output.c_str());
+
+  auto &Sinks = Logger->sinks();
+  Sinks.erase(std::remove(Sinks.begin(), Sinks.end(), Sink), Sinks.end());
+  Logger->set_level(PrevLevel);
 }
 
 TEST(CompileSubcommand, OutputFormat) {

@@ -89,17 +89,18 @@ int Compiler([[maybe_unused]] struct DriverCompilerOptions &Opt) noexcept {
                           {"3"sv, OptimizationLevel::O3},
                           {"s"sv, OptimizationLevel::Os},
                           {"z"sv, OptimizationLevel::Oz}}};
+  const std::string_view OptValue = Opt.PropOptimizationLevel.value().empty()
+                                        ? "2"sv
+                                        : Opt.PropOptimizationLevel.value();
   const auto Level =
       std::find_if(OptimizationLevels.begin(), OptimizationLevels.end(),
-                   [&Opt](const auto &L) {
-                     return L.first == Opt.PropOptimizationLevel.value();
-                   });
+                   [&OptValue](const auto &L) { return L.first == OptValue; });
   if (Level != OptimizationLevels.end()) {
     Conf.getCompilerConfigure().setOptimizationLevel(Level->second);
   } else {
     spdlog::warn("Unknown --optimize value: \"{}\"; using 2. Valid values: 0, "
                  "1, 2, 3, s, z."sv,
-                 Opt.PropOptimizationLevel.value());
+                 OptValue);
     Conf.getCompilerConfigure().setOptimizationLevel(OptimizationLevel::O2);
   }
 
